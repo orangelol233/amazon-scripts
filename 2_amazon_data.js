@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         2_Amazon Analyzer Data Extractor
 // @namespace    http://tampermonkey.net/
-// @version      1.3  // 版本更新
+// @version      1.4  // 版本更新
 // @description  提取商品数据（增强容错/多站点支持）
-// @require      tampermonkey:///?id=b8ff6911-2c84-47b3-aa6f-b715388ef489
+// @require      https://raw.githubusercontent.com/orangelol233/amazon-scripts/main/1_amazon_utils.js
 // @grant        none
 // ==/UserScript==
 
