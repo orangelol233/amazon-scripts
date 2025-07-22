@@ -18,6 +18,19 @@
     }
 
     window.AmazonAnalyzerReport = {
+        generateAnalysisReport: (items) => {
+             // 类型安全检查
+            if (!Array.isArray(items)) {
+                console.error('Expected array, got:', typeof items, items);
+                return "分析失败：数据格式异常（非数组）";
+            }
+            // 过滤有效商品
+            const validItems = items.filter(item => 
+                item?.price > 0 && item?.name !== '未知商品'
+                                           );
+            if (validItems.length === 0) {
+                return "未找到有效商品数据";
+            }
         /**
          * 生成分析报告
          * @param {Array} items - 商品数据数组
@@ -63,4 +76,6 @@
             return report;
         }
     };
+    return `分析成功：共 ${validItems.length} 个商品`;
+}
 })();
