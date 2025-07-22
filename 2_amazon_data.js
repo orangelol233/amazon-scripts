@@ -1,117 +1,94 @@
 // ==UserScript==
 // @name         2_Amazon Analyzer Data Extractor
 // @namespace    http://tampermonkey.net/
-// @version      1.4  // 版本更新
-// @description  提取商品数据（增强容错/多站点支持）
-// @require      https://raw.githubusercontent.com/orangelol233/amazon-scripts/main/1_amazon_utils.js
+// @version      1.3
+// @description  亚马逊商品数据提取器
+// @author       Lily
+// @match        https://www.amazon.com/*
+// @match        https://www.amazon.co.jp/*
 // @grant        none
+// @require      https://fastly.jsdelivr.net/gh/orangelol233/amazon-scripts@main/1_amazon_utils.js
 // ==/UserScript==
 
 (function() {
     'use strict';
-
-    if (!window.AmazonAnalyzerUtils) {
-        console.error('Utils工具库未加载！');
-        return;
-    }
-
-    window.AmazonAnalyzerData = {
-        /**
-         * 增强版商品等待逻辑
-         * @param {number} [timeout=10000] 超时时间(ms)
-         */
-        async waitForProducts(timeout = 10000) {
-            return new Promise((resolve, reject) => {
-                const startTime = Date.now();
-                const check = () => {
-                    // 多站点兼容选择器
-                    const validItems = [
-                        '[data-component-type="s-search-result"]',
-                        '.s-result-item',
-                        '[cel_widget_id*="MAIN-SEARCH_RESULTS"]',
-                        '[data-asin][data-index]'  // 通用ASIN选择器
-                    ].some(selector => 
-                        document.querySelectorAll(selector).length > 3
-                    );
-
-                    if (validItems) {
-                        resolve();
-                    } else if (Date.now() - startTime > timeout) {
-                        reject(new Error(`等待商品超时 (${timeout}ms)`));
-                    } else {
-                        setTimeout(check, 500);
-                    }
+    
+    const VERSION = '1.3';
+    
+    // 主工具对象
+    const DataExtractor = {
+        version: VERSION,
+        
+        // 提取商品基础数据
+        extractProductData: function(products) {
+            return Array.from(products).map(item => {
+                const asin = item.getAttribute('data-asin') || '';
+                const priceElement = item.querySelector('.a-price[data-a-size="xl"] .a-offscreen');
+                const priceText = priceElement ? priceElement.textContent : '$0.00';
+                
+                return {
+                    asin: asin,
+                    title: item.querySelector('h2 a')?.textContent.trim() || '无标题',
+                    price: window.AmazonAnalyzerUtils.extractPrice(priceText),
+                    rating: parseFloat(item.querySelector('.a-icon-star-small .a-icon-alt')?.textContent.split(' ')[0] || 0),
+                    reviewCount: parseInt(
+                        item.querySelector('.a-size-small .a-size-base')?.textContent.replace(/,/g, '') || 0
+                    ),
+                    url: item.querySelector('h2 a')?.href || `https://www.amazon.com/dp/${asin}`,
+                    imageUrl: item.querySelector('img.s-image')?.src || ''
                 };
-                check();
             });
         },
-
-        /**
-         * 安全提取商品数据
-         * @returns {Array} 始终返回数组（可能为空）
-         */
-        extractProductData() {
-            try {
-                // 防御性选择器查询
-                const items = [
-                    ...document.querySelectorAll(`
-                        [data-component-type="s-search-result"],
-                        .s-result-item,
-                        [cel_widget_id*="MAIN-SEARCH_RESULTS"],
-                        [data-asin]:not(iframe [data-asin])  // 排除iframe内元素
-                    `)
-                ].filter(Boolean);  // 过滤null
-
-                if (!items.length) {
-                    console.warn('未找到任何商品容器元素');
-                    return [];
-                }
-
-                return items.map(item => {
-                    // 统一使用dataset.asin作为商品唯一标识
-                    const asin = item.dataset?.asin || 
-                                item.closest('[data-asin]')?.dataset?.asin || 
-                                'N/A';
-
-                    // 价格提取增强（支持多种货币格式）
-                    const priceText = item.querySelector(`
-                        .a-price-whole,
-                        .a-price .a-offscreen,
-                        .priceBlock .price
-                    `)?.textContent?.replace(/[^0-9.]/g, '') || '0';
-
-                    return {
-                        asin,  // 确保始终有ASIN
-                        name: item.querySelector(`
-                            h2 a span,
-                            .a-text-normal > span,
-                            .a-size-medium
-                        `)?.textContent?.trim() || `未知商品_${asin}`,
-                        price: parseFloat(priceText) || 0,
-                        rating: parseFloat(
-                            item.querySelector(`
-                                .a-icon-star-small,
-                                .a-star-small,
-                                [aria-label*="stars"]
-                            `)?.getAttribute('aria-label')?.match(/[\d.]+/)?.[0] || '0'
-                        ),
-                        reviewCount: parseInt(
-                            item.querySelector(`
-                                .a-size-base,
-                                .reviewCountText,
-                                [href*="product-reviews"]
-                            `)?.textContent?.replace(/\D/g, '') || '0'
-                        ),
-                        url: item.querySelector(`
-                            h2 a,
-                            .a-link-normal[href*="/dp/"]
-                        `)?.href || `https://www.amazon.com/dp/${asin}`
-                    };
-                });
-            } catch (e) {
-                console.error('数据提取异常:', e);
-                return [];  // 确保始终返回数组
-            }
+        
+        // 提取搜索关键词
+        extractSearchKeyword: function() {
+            const input = document.getElementById('twotabsearchtextbox');
+            return input ? input.value.trim() : '';
+        },
+        
+        // 提取分页信息
+        extractPaginationInfo: function() {
+            const pagination = document.querySelector('.s-pagination-strip');
+            if (!pagination) return null;
+            
+            return {
+                currentPage: parseInt(pagination.querySelector('.s-pagination-selected')?.textContent || '1'),
+                totalPages: Array.from(pagination.querySelectorAll('.s-pagination-item:not(.s-pagination-separator)'))
+                    .map(el => parseInt(el.textContent))
+                    .filter(num => !isNaN(num))
+                    .pop() || 1
+            };
+        },
+        
+        // 提取排序方式
+        extractSortMethod: function() {
+            const selected = document.querySelector('#s-result-sort-select option[selected]');
+            return selected ? selected.textContent.trim() : '默认排序';
+        },
+        
+        // 增强数据校验
+        validateProductData: function(data) {
+            return data.filter(item => {
+                return (
+                    item.asin && 
+                    item.asin.length >= 10 &&
+                    !isNaN(item.price) &&
+                    item.price > 0
+                );
+            });
         }
     };
+    
+    // 全局导出（关键修改点！）
+    if (typeof window.AmazonAnalyzerData === 'undefined') {
+        window.AmazonAnalyzerData = DataExtractor;
+        console.log(`[AA] Data Extractor v${VERSION} 已加载`);
+        
+        // 依赖检查
+        if (!window.AmazonAnalyzerUtils) {
+            console.error('[AA] 错误: 未找到AmazonAnalyzerUtils');
+        }
+    } else {
+        console.warn('[AA] 警告: Data Extractor重复加载');
+    }
 })();
