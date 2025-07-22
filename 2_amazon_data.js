@@ -11,6 +11,13 @@
     'use strict';
 
     window.AmazonAnalyzerData = {
+        extractProductData: () => {
+            items = [...document.querySelectorAll('[data-component-type="s-search-result"]')];
+            console.log("提取到的商品DOM节点:", items); // 调试1
+            const products = items.map(item => { /* 解析逻辑 */ });
+            console.log("处理后商品数据:", products); // 调试2
+            return products;
+        }
         async waitForProducts() {
             // ...原有等待商品加载逻辑...
         },
