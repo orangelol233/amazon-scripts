@@ -4,8 +4,8 @@
 // @version      1.5
 // @description  生成亚马逊商品分析报告（低分商品评价数+最低价TOP3）
 // @author       Lily
-// @require      tampermonkey:///?id=b8ff6911-2c84-47b3-aa6f-b715388ef489  # Utils
-// @require      tampermonkey:///?id=6287980e-20a5-4b54-9406-64601bde908b  # Data
+// @require      https://raw.githubusercontent.com/orangelol233/amazon-scripts/main/1_amazon_utils.js
+// @require      https://raw.githubusercontent.com/orangelol233/amazon-scripts/main/2_amazon_data.js
 // @grant        none
 // ==/UserScript==
 
